@@ -1,8 +1,9 @@
-from flask import Flask, request, jsonify
 import logging
-import json
+
+import requests
+from flask import Flask, request, jsonify
+
 # импортируем функции из нашего второго файла geo
-from geo import get_country, get_distance, get_coordinates
 
 app = Flask(__name__)
 
@@ -32,34 +33,31 @@ def index():
 
 
 def handle_dialog(res, req):
-    user_id = req['session']['user_id']
-    if req['session']['new']:
-        res['response']['text'] = \
-            'Привет! Я могу показать город или сказать расстояние между городами!'
-        return
-    # Получаем города из нашего
-    cities = get_cities(req)
-    if not cities:
-        res['response']['text'] = 'Ты не написал название не одного города!'
-    elif len(cities) == 1:
-        res['response']['text'] = 'Этот город в стране - ' + \
-                                  get_country(cities[0])
-    elif len(cities) == 2:
-        distance = get_distance(get_coordinates(
-            cities[0]), get_coordinates(cities[1]))
-        res['response']['text'] = 'Расстояние между этими городами: ' + \
-                                  str(round(distance)) + ' км.'
+    if 'переведи слово' in req['request']['command'] or \
+            'переведите слово' in req['request']['command']:
+        word = req['request']['command'].split('слово')[-1].strip()
+        res['response']['text'] = translate_(word)
     else:
-        res['response']['text'] = 'Слишком много городов!'
+        res['response']['text'] = 'Для перевода слова введите "Переведите (переведи) слово: *слово*"'
 
 
-def get_cities(req):
-    cities = []
-    for entity in req['request']['nlu']['entities']:
-        if entity['type'] == 'YANDEX.GEO':
-            if 'city' in entity['value']:
-                cities.append(entity['value']['city'])
-    return cities
+def translate_(word):
+    url = "https://google-translate1.p.rapidapi.com/language/translate/v2"
+
+    params = {
+        'q': word,
+        'target': 'en'
+    }
+    headers = {
+        "content-type": "application/x-www-form-urlencoded",
+        "Accept-Encoding": "application/gzip",
+        "X-RapidAPI-Key": "51dd84cef1msh5ae12c433b80c0dp1b101fjsn3354a2ebb2ac",
+        "X-RapidAPI-Host": "google-translate1.p.rapidapi.com"
+    }
+
+    response = requests.request("POST", url, data=params, headers=headers).json()
+
+    return response['data']['translations'][0]['translatedText']
 
 
 if __name__ == '__main__':
